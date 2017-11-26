@@ -1,3 +1,5 @@
+// Usage:
+//  go run sql_writer.go -db test.sql
 package main
 
 import (

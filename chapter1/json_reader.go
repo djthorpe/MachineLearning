@@ -1,3 +1,5 @@
+// Usage:
+//  go run json_reader.go
 package main
 
 import (

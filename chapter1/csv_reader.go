@@ -1,3 +1,5 @@
+// Usage:
+//  go run csv_reader.go data.csv
 package main
 
 import (
