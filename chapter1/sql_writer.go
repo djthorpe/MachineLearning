@@ -1,14 +1,19 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -53,6 +58,24 @@ type station struct {
 const (
 	// The URL which contains the citibike information
 	CITIBIKE_URL = "https://gbfs.citibikenyc.com/gbfs/en/station_status.json"
+
+	// The table name
+	SQL_TABLENAME = "station"
+)
+
+var (
+	FlagDatabasePath = flag.String("db", "", "Path to the database")
+
+	SQL_COLUMNS = []string{
+		"id integer not null primary key",
+		"last_reported string not null",
+		"is_installed bool",
+		"is_renting bool",
+		"docks_available integer",
+		"docks_disabled integer",
+		"bikes_available integer",
+		"bikes_disabled integer",
+	}
 )
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -97,7 +120,85 @@ func (s *station) String() string {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+func TableExists(db *sql.DB, name string) (bool, error) {
+	if resultset, err := db.Query("SELECT name FROM sqlite_master WHERE type='table'"); err != nil {
+		return false, err
+	} else {
+		defer resultset.Close()
+		for resultset.Next() {
+			var name2 string
+			if err := resultset.Scan(&name2); err != nil {
+				return false, err
+			}
+			if name == name2 {
+				return true, nil
+			}
+		}
+		if err := resultset.Err(); err != nil {
+			return false, err
+		}
+		return false, nil
+	}
+}
+
+func CreateTable(db *sql.DB, name string, columns []string) error {
+	if _, err := db.Exec(fmt.Sprintf("CREATE TABLE %v (%v)", name, strings.Join(columns, ","))); err != nil {
+		return err
+	}
+	return nil
+}
+
+func WriteData(db *sql.DB, data CitibikeStationData) error {
+	// Check for SQL table, create as necessary
+	if exists, err := TableExists(db, SQL_TABLENAME); err != nil {
+		return err
+	} else if exists == false {
+		if err := CreateTable(db, SQL_TABLENAME, SQL_COLUMNS); err != nil {
+			return err
+		}
+	}
+
+	// Start transaction
+	if tx, err := db.Begin(); err != nil {
+		return err
+	} else {
+		// Prepare statement
+		if stmt, err := tx.Prepare(fmt.Sprintf("INSERT OR REPLACE INTO %v values(?,?,?,?,?,?,?,?)", SQL_TABLENAME)); err != nil {
+			return err
+		} else {
+			defer stmt.Close()
+
+			// Write out station data
+			for _, station := range data.Data.Stations {
+				if _, err := stmt.Exec(station.StationId, station.LastReported.String(), station.IsInstalled, station.IsRenting, station.DocksAvailable, station.DocksDisabled, station.BikesAvailable, station.BikesDisabled); err != nil {
+					return err
+				}
+			}
+		}
+
+		// Commit transaction
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func RunMain() int {
+	// Check database flag
+	if *FlagDatabasePath == "" {
+		log.Println("Expected -db flag")
+		return -1
+	}
+	// Open the database
+	db, err := sql.Open("sqlite3", *FlagDatabasePath)
+	if err != nil {
+		log.Println(err)
+		return -1
+	}
+	defer db.Close()
+
 	// Get the JSON response from the URL
 	if response, err := http.Get(CITIBIKE_URL); err != nil {
 		log.Println(err)
@@ -114,8 +215,11 @@ func RunMain() int {
 				log.Println(err)
 				return -1
 			}
-			// Print out the data on stdout
-			fmt.Println(data)
+			// Write out the station data
+			if err := WriteData(db, data); err != nil {
+				log.Println(err)
+				return -1
+			}
 		}
 	}
 	return 0
@@ -124,5 +228,6 @@ func RunMain() int {
 ///////////////////////////////////////////////////////////////////////////////
 
 func main() {
+	flag.Parse()
 	os.Exit(RunMain())
 }
