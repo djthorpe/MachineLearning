@@ -17,4 +17,5 @@
 .vscode/
 *.sql
 *.json
+*.png
 .DS_Store

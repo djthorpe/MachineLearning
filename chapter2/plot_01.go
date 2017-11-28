@@ -12,6 +12,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"path"
 
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
@@ -69,7 +70,10 @@ func RunMain() int {
 		log.Println("Expected file argument")
 		return -1
 	}
-	if f, err := os.Open(flag.Arg(0)); err != nil {
+
+	filename := flag.Arg(0)
+
+	if f, err := os.Open(filename); err != nil {
 		log.Println(err)
 		return -1
 	} else {
@@ -101,7 +105,8 @@ func RunMain() int {
 			p.Add(h)
 
 			// Save the plot to a PNG file.
-			if err := p.Save(4*vg.Inch, 4*vg.Inch, flag.Arg(0)+"_hist.png"); err != nil {
+			
+			if err := p.Save(4*vg.Inch, 4*vg.Inch, path.Base(filename)+"_hist.png"); err != nil {
 				log.Println(err)
 				return -1
 			}
