@@ -15,25 +15,28 @@ import (
 
 ///////////////////////////////////////////////////////////////////////////////
 
-var (
-	flagSkipHeader = flag.Bool("skip_header", true, "Skip CSV header row")
-)
-
-var (
-	ErrEmpty = fmt.Errorf("Empty string")
-)
-
 func RunMain() int {
 	if flag.NArg() != 1 {
 		log.Println("Expected file argument")
 		return -1
 	}
 
-	//filename := flag.Arg(0)
-
+	filename := flag.Arg(0)
 	table, _ := util.NewTable()
+	if err := table.ReadCSV(filename, false, true, true); err != nil {
+		log.Println(err)
+		return -1
+	}
 
 	fmt.Println(table)
+
+	if column, err := table.StringColumn(table.Columns[2], "<nil>"); err != nil {
+		log.Println(err)
+		return -1
+	} else {
+		fmt.Println(column)
+	}
+
 	return 0
 }
 
