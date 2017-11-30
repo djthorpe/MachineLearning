@@ -1,7 +1,7 @@
 // Usage:
 //  go get -u gonum.org/v1/plot/...
 //  go run plot_02.go iris.csv
-//  open iris.csv_hist.png
+//  open iris.csv_boxplots.png
 package main
 
 import (
@@ -51,12 +51,12 @@ func RunMain() int {
 		for i, name := range table.Columns {
 			// If the column is one of the feature columns, let's create
 			// a histogram of the values.
-			if name != "species" {
+			if name != "Name" {
 				// Create a plotter.Values
 				if v, err := table.FloatColumn(name, math.NaN()); err != nil {
 					log.Println(err)
 					return -1
-				} else if b, err := plotter.NewBoxPlot(w, float64(i), v); err != nil {
+				} else if b, err := plotter.NewBoxPlot(w, float64(i), plotter.Values(v)); err != nil {
 					log.Println(err)
 					return -1
 				} else {
@@ -65,7 +65,11 @@ func RunMain() int {
 			}
 		}
 
-		if err := p.Save(4*vg.Inch, 4*vg.Inch, path.Base(filename)+"_hist.png"); err != nil {
+		// Set the X axis of the plot to nominal with
+		// the given names for x=0, x=1, etc.
+		p.NominalX("SepalLength", "SepalWidth", "PetalLength", "PetalWidth")
+
+		if err := p.Save(4*vg.Inch, 4*vg.Inch, path.Base(filename)+"_boxplots.png"); err != nil {
 			log.Println(err)
 			return -1
 		}
