@@ -4,15 +4,24 @@ import (
 	"bytes"
 	"encoding/csv"
 	"fmt"
+	"math"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/olekukonko/tablewriter"
 )
 
+// Error is an error message with potentially a line number
+type Error struct {
+	reason string
+	line   int
+}
+
 // Value is a single value in the data
 type Value struct {
-	Str string
+	Str   string
+	Float *float64
 }
 
 // Table is the table of values with optional column headers
@@ -23,10 +32,10 @@ type Table struct {
 }
 
 var (
-	ErrDuplicateColumn = fmt.Errorf("Duplicate or invalid column name")
-	ErrDimensionError  = fmt.Errorf("Too many values for row")
-	ErrOutOfRange      = fmt.Errorf("Index out of range")
-	ErrNotFound        = fmt.Errorf("Column Not Found")
+	ErrDuplicateColumn = &Error{reason: "Duplicate or invalid column name"}
+	ErrDimensionError  = &Error{reason: "Too many values for row"}
+	ErrOutOfRange      = &Error{reason: "Index out of range"}
+	ErrNotFound        = &Error{reason: "Column Not Found"}
 )
 
 // NewTable creates a new table with specified columns
@@ -138,7 +147,23 @@ func (this *Table) StringColumn(c string, nil_string string) ([]string, error) {
 // any values are nil then the nil_value is used (usually 0.0). If any value cannot be
 // converted to a float, then an error is returned
 func (this *Table) FloatColumn(c string, nil_value float64) ([]float64, error) {
-	// TODO
+	if n, exists := this.colmap[c]; exists == false {
+		return nil, ErrNotFound
+	} else {
+		column := make([]float64, len(this.Rows))
+		for i, values := range this.Rows {
+			if n >= len(values) || values[n] == nil {
+				column[i] = nil_value
+			} else {
+				if float, err := values[n].Float64(); err != nil {
+					return nil, err
+				} else {
+					column[i] = float
+				}
+			}
+		}
+		return column, nil
+	}
 }
 
 // ReadCSV reads data from a CSV file. Sometimes there are comments
@@ -178,6 +203,33 @@ func (this *Table) ReadCSV(filename string, skip_header, skip_comments, treat_em
 // Stringify
 func (this *Value) String() string {
 	return this.Str
+}
+
+func (this *Error) Error() string {
+	if this.line == 0 {
+		return this.reason
+	} else {
+		return fmt.Sprintf("%v @ line %v", this.reason, this.line)
+	}
+}
+
+func (this *Error) Line(i int) {
+	this.line = i
+}
+
+func (this *Value) Float64() (float64, error) {
+	if this.Float != nil {
+		return *this.Float, nil
+	} else if f, err := float64conv(this.Str); err != nil {
+		return math.NaN(), err
+	} else {
+		this.Float = &f
+		return f, nil
+	}
+}
+
+func float64conv(str string) (float64, error) {
+	return strconv.ParseFloat(str, 64)
 }
 
 // Output table as ASCII table
