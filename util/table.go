@@ -20,8 +20,9 @@ type Error struct {
 
 // Value is a single value in the data
 type Value struct {
-	Str   string
-	Float *float64
+	Str      string
+	_Uint64  *uint64
+	_Float64 *float64
 }
 
 // Table is the table of values with optional column headers
@@ -166,6 +167,29 @@ func (this *Table) FloatColumn(c string, nil_value float64) ([]float64, error) {
 	}
 }
 
+// UintColumn returns all values in a specific named column, c as uint values. If
+// any values are nil then the nil_value is used (usually 0). If any value cannot be
+// converted to a uint, then an error is returned
+func (this *Table) UintColumn(c string, nil_value uint) ([]uint, error) {
+	if n, exists := this.colmap[c]; exists == false {
+		return nil, ErrNotFound
+	} else {
+		column := make([]uint, len(this.Rows))
+		for i, values := range this.Rows {
+			if n >= len(values) || values[n] == nil {
+				column[i] = nil_value
+			} else {
+				if value, err := values[n].Uint64(); err != nil {
+					return nil, err
+				} else {
+					column[i] = uint(value)
+				}
+			}
+		}
+		return column, nil
+	}
+}
+
 // ReadCSV reads data from a CSV file. Sometimes there are comments
 // and a header line within the file
 func (this *Table) ReadCSV(filename string, skip_header, skip_comments, treat_empty_as_nil bool) error {
@@ -218,13 +242,24 @@ func (this *Error) Line(i int) {
 }
 
 func (this *Value) Float64() (float64, error) {
-	if this.Float != nil {
-		return *this.Float, nil
+	if this._Float64 != nil {
+		return *this._Float64, nil
 	} else if f, err := float64conv(this.Str); err != nil {
 		return math.NaN(), err
 	} else {
-		this.Float = &f
+		this._Float64 = &f
 		return f, nil
+	}
+}
+
+func (this *Value) Uint64() (uint64, error) {
+	if this._Uint64 != nil {
+		return *this._Uint64, nil
+	} else if v, err := strconv.ParseUint(this.Str, 10, 64); err != nil {
+		return 0, err
+	} else {
+		this._Uint64 = &v
+		return v, nil
 	}
 }
 
