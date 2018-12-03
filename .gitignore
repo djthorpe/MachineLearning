@@ -19,3 +19,4 @@
 *.json
 *.png
 .DS_Store
+go.sum

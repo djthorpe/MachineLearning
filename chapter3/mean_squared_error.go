@@ -10,7 +10,9 @@ import (
 	"math"
 	"os"
 
+	// Utilities for reading data
 	"github.com/djthorpe/MachineLearning/util"
+	"gonum.org/v1/gonum/stat"
 )
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -46,8 +48,12 @@ func RunMain() int {
 			mSE += math.Pow(observed[i]-predicted[i], 2) / float64(len(observed))
 		}
 		// Output the MAE and MSE value to standard out.
-		fmt.Printf("\nMAE = %0.2f\n", mAE)
-		fmt.Printf("\nMSE = %0.2f\n\n", mSE)
+		fmt.Printf("MAE = %0.2f\n", mAE)
+		fmt.Printf("MSE = %0.2f\n", mSE)
+
+		// Calculate R squared
+		fmt.Printf("R^2 = %0.2f\n", stat.RSquaredFrom(observed, predicted, nil))
+
 	}
 	return 0
 }
