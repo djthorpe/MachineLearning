@@ -22,6 +22,7 @@ type Error struct {
 type Value struct {
 	Str      string
 	_Uint64  *uint64
+	_Int64   *int64
 	_Float64 *float64
 }
 
@@ -46,6 +47,24 @@ func NewTable(columns ...string) (*Table, error) {
 		return nil, err
 	}
 	return this, nil
+}
+
+// Subsample creates a new table from an existing table with
+// the specified rows
+func (this *Table) Subsample(rows []int) (*Table, error) {
+	that := new(Table)
+	if err := that.SetColumns(this.Columns...); err != nil {
+		return nil, err
+	} else {
+		that.Rows = make([][]*Value, 0, len(rows))
+		for _, row := range rows {
+			if row < 0 || row >= len(this.Rows) {
+				return nil, ErrOutOfRange
+			}
+			that.Rows = append(that.Rows, this.Rows[row])
+		}
+	}
+	return that, nil
 }
 
 // SetColumns sets the columns for the table
@@ -75,6 +94,54 @@ func (this *Table) AppendColumns(columns ...string) error {
 		this.Columns = append(this.Columns, column)
 	}
 	return nil
+}
+
+// TypeForColumn returns uint, int or float as a string depending
+// on whether a column is all uint, int or float. It can also
+// return empty string if indeterminate (empty data, for example)
+func (this *Table) TypeForColumn(c string) (string, error) {
+	if n, exists := this.colmap[c]; exists == false {
+		return "", ErrNotFound
+	} else {
+		var not_float, not_uint, not_int, any bool
+		for _, values := range this.Rows {
+			if n >= len(values) || values[n] == nil {
+				continue
+			}
+			if not_float == false {
+				// check for float
+				if _, err := values[n].Float64(); err != nil {
+					any = true
+					not_float = true
+				}
+			}
+			if not_uint == false {
+				// check for uint
+				if _, err := values[n].Uint64(); err != nil {
+					any = true
+					not_uint = true
+				}
+			}
+			if not_int == false {
+				// check for uint
+				if _, err := values[n].Int64(); err != nil {
+					any = true
+					not_int = true
+				}
+			}
+		}
+		if any == false {
+			return "", ErrOutOfRange
+		} else if not_int == true && not_uint == true && not_float == true {
+			return "", nil
+		} else if not_int == true && not_uint == true {
+			return "float", nil
+		} else if not_uint == true {
+			return "int", nil
+		} else {
+			return "uint", nil
+		}
+	}
 }
 
 // AppendStringRow appends a row of string values onto the table
@@ -190,6 +257,48 @@ func (this *Table) UintColumn(c string, nil_value uint) ([]uint, error) {
 	}
 }
 
+// UintPointerColumn returns all values in a specific named column, c as
+// *uint values. If any values are nil then the pointer is nil. If any value cannot be
+// converted to a uint, then an error is returned
+func (this *Table) UintPointerColumn(c string) ([]*uint, error) {
+	if n, exists := this.colmap[c]; exists == false {
+		return nil, ErrNotFound
+	} else {
+		column := make([]*uint, len(this.Rows))
+		for i, values := range this.Rows {
+			if n >= len(values) || values[n] == nil {
+				column[i] = nil
+			} else {
+				if value, err := values[n].Uint64(); err != nil {
+					return nil, err
+				} else {
+					v := uint(value)
+					column[i] = &v
+				}
+			}
+		}
+		return column, nil
+	}
+}
+
+// UintValues returns unique values in a specific names column, c
+// or will return error on failure
+func (this *Table) UintValues(c string) ([]uint, error) {
+	if values, err := this.UintPointerColumn(c); err != nil {
+		return nil, err
+	} else {
+		classmap := make(map[uint]bool)
+		classes := make([]uint, 0)
+		for _, key := range values {
+			if _, exists := classmap[*key]; exists == false {
+				classmap[*key] = true
+				classes = append(classes, *key)
+			}
+		}
+		return classes, nil
+	}
+}
+
 // ReadCSV reads data from a CSV file. Sometimes there are comments
 // and a header line within the file
 func (this *Table) ReadCSV(filename string, skip_header, skip_comments, treat_empty_as_nil bool) error {
@@ -259,6 +368,17 @@ func (this *Value) Uint64() (uint64, error) {
 		return 0, err
 	} else {
 		this._Uint64 = &v
+		return v, nil
+	}
+}
+
+func (this *Value) Int64() (int64, error) {
+	if this._Int64 != nil {
+		return *this._Int64, nil
+	} else if v, err := strconv.ParseInt(this.Str, 10, 64); err != nil {
+		return 0, err
+	} else {
+		this._Int64 = &v
 		return v, nil
 	}
 }

@@ -37,19 +37,37 @@ func RunMain() int {
 	} else if len(observed) != len(predicted) {
 		log.Println("Observed and predicted samples mismatch")
 		return -1
+	} else if classes, err := table.UintValues(table.Columns[0]); err != nil {
+		log.Println(err)
+		return -1
 	} else {
-		var true_positive, false_positive uint
-		for i := range observed {
-			if observed[i] == predicted[i] {
-				true_positive++
-			} else if observed[i] != predicted[i] {
-				false_positive++
+		for _, class := range classes {
+			var true_positive, false_positive uint
+			var true_negative, false_negative uint
+			for i := range observed {
+				if observed[i] == class {
+					if predicted[i] == observed[i] {
+						true_positive++
+					} else {
+						false_negative++
+					}
+				} else {
+					if predicted[i] == observed[i] {
+						false_positive++
+					} else {
+						true_negative++
+					}
+				}
 			}
+
+			precision := float64(true_positive) / float64(true_positive+false_positive)
+			recall := float64(true_positive) / float64(true_positive+false_negative)
+
+			fmt.Println("Class", class, "=>")
+			fmt.Printf("  precision=%.2f\n", precision)
+			fmt.Printf("  recall=%.2f\n", recall)
+			fmt.Println("")
 		}
-		fmt.Println(table)
-		fmt.Println("true_positive=", true_positive)
-		fmt.Println("false_positive=", false_positive)
-		fmt.Printf("accuracy= %0.2f\n", float64(true_positive)/float64(true_positive+false_positive))
 	}
 	return 0
 }
