@@ -108,25 +108,27 @@ func (this *Table) TypeForColumn(c string) (string, error) {
 			if n >= len(values) || values[n] == nil {
 				continue
 			}
-			if not_float == false {
-				// check for float
-				if _, err := values[n].Float64(); err != nil {
-					any = true
-					not_float = true
+			// We have seen a value
+			any = true
+			// Check for int first
+			if not_int == false {
+				// check for int
+				if _, err := values[n].Int64(); err != nil {
+					not_int = true
 				}
 			}
+			// Then check for uint
 			if not_uint == false {
 				// check for uint
 				if _, err := values[n].Uint64(); err != nil {
-					any = true
 					not_uint = true
 				}
 			}
-			if not_int == false {
-				// check for uint
-				if _, err := values[n].Int64(); err != nil {
-					any = true
-					not_int = true
+			// Finally check for float
+			if not_float == false {
+				// check for float
+				if _, err := values[n].Float64(); err != nil {
+					not_float = true
 				}
 			}
 		}

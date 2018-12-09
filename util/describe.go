@@ -12,29 +12,52 @@ func (this *Table) Describe() (*Table, error) {
 		return nil, err
 	}
 	// Compute the number of samples for each column
-	that.AppendStringRow(this.describe_samples(), true)
 	that.AppendStringRow(this.describe_type(), true)
+	r1, r2, r3 := this.describe_samples()
+	that.AppendStringRow(r1, true)
+	that.AppendStringRow(r2, true)
+	that.AppendStringRow(r3, true)
 	return that, nil
-}
-
-func (this *Table) describe_samples() []string {
-	samples := make([]uint, len(this.Columns))
-	for _, row := range this.Rows {
-		for column := range row {
-			if row[column] != nil {
-				samples[column]++
-			}
-		}
-	}
-	samples_str := make([]string, len(samples)+1)
-	samples_str[0] = "samples"
-	for i := range samples {
-		samples_str[i+1] = fmt.Sprint(samples[i])
-	}
-	return samples_str
 }
 
 func (this *Table) describe_type() []string {
 	types_str := make([]string, len(this.Columns)+1)
+	types_str[0] = "type"
+	for i, c := range this.Columns {
+		if t, err := this.TypeForColumn(c); err == nil {
+			types_str[i+1] = t
+		}
+	}
 	return types_str
+}
+
+func (this *Table) describe_samples() ([]string, []string, []string) {
+	samples_str := make([]string, len(this.Columns)+1)
+	sum_str := make([]string, len(this.Columns)+1)
+	mean_str := make([]string, len(this.Columns)+1)
+	samples_str[0] = "samples"
+	sum_str[0] = "sum"
+	mean_str[0] = "mean"
+	for column := range this.Columns {
+		var sum float64
+		var cells, samples uint
+		for row := range this.Rows {
+			if value := this.Rows[row][column]; value != nil {
+				cells++
+				if v, err := value.Float64(); err == nil {
+					sum += v
+					samples++
+				}
+			}
+		}
+		if cells > 0 {
+			samples_str[column+1] = fmt.Sprint(cells)
+		}
+		if samples > 0 {
+			sum_str[column+1] = fmt.Sprintf("%.2f", sum)
+			mean_str[column+1] = fmt.Sprintf("%.2f", sum/float64(samples))
+		}
+
+	}
+	return samples_str, sum_str, mean_str
 }
